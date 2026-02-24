@@ -62,6 +62,8 @@ const anomalyRoutes = require('./routes/anomalyRoutes');
 app.use('/api/anomalies', anomalyRoutes);
 const ocrRoutes = require('./routes/ocrRoutes');
 app.use('/api/ocr', ocrRoutes);
+const analyticsRoutes = require('./routes/analytics');
+app.use('/api/analytics', analyticsRoutes);
 
 // ✅ 404 handler (NO wildcard, this is the fix)
 app.use((req, res) => {

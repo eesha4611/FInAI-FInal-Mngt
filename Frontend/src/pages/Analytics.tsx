@@ -1,178 +1,306 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import api from "../api/axios";
 import { 
-  CalendarIcon,
-  ArrowTrendingUpIcon,
-  ArrowTrendingDownIcon,
-  ChartBarIcon,
-  CurrencyDollarIcon,
-  ShoppingBagIcon,
-  HomeIcon,
-  TruckIcon,
-  FilmIcon
-} from '@heroicons/react/24/outline';
-import { 
-  LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, 
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, 
   Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend 
 } from 'recharts';
 
+interface MonthlyData {
+  month: string;
+  income: number;
+  expense: number;
+  net: number;
+}
+
+interface CategoryData {
+  category: string;
+  total: number;
+}
+
+interface WeeklyData {
+  day: string;
+  total: number;
+}
+
+interface AnalyticsData {
+  monthly: MonthlyData[];
+  categories: CategoryData[];
+  weekly: WeeklyData[];
+}
+
 const Analytics: React.FC = () => {
-  const [timeRange, setTimeRange] = useState('monthly');
+  const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Monthly spending data
-  const monthlyData = [
-    { month: 'Aug', income: 25000, expense: 14200, savings: 10800 },
-    { month: 'Sep', income: 25000, expense: 15800, savings: 9200 },
-    { month: 'Oct', income: 25000, expense: 17200, savings: 7800 },
-    { month: 'Nov', income: 25000, expense: 16500, savings: 8500 },
-    { month: 'Dec', income: 25000, expense: 18900, savings: 6100 },
-    { month: 'Jan', income: 25000, expense: 14500, savings: 10500 },
-    { month: 'Feb', income: 25000, expense: 16250, savings: 8750 },
-  ];
+  useEffect(() => {
+    const fetchAnalytics = async () => {
+      try {
+        const user = JSON.parse(localStorage.getItem("user") || "{}");
+        
+        const response = await api.get(
+          `/api/analytics/${user.id}`,
+          {
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem("token")}` 
+            }
+          }
+        );
 
-  // Weekly spending
-  const weeklyData = [
-    { day: 'Mon', amount: 2200 },
-    { day: 'Tue', amount: 1800 },
-    { day: 'Wed', amount: 3100 },
-    { day: 'Thu', amount: 2700 },
-    { day: 'Fri', amount: 4200 },
-    { day: 'Sat', amount: 3800 },
-    { day: 'Sun', amount: 1500 },
-  ];
+        setAnalytics(response.data.data);
+      } catch (err: any) {
+        setError(err?.message || "Failed to fetch analytics");
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  // Category breakdown
-  const categoryData = [
-    { name: 'Food & Dining', value: 25, color: '#3B82F6', icon: ShoppingBagIcon, trend: '+12%' },
-    { name: 'Shopping', value: 20, color: '#8B5CF6', icon: ShoppingBagIcon, trend: '+25%' },
-    { name: 'Rent', value: 35, color: '#EF4444', icon: HomeIcon, trend: '0%' },
-    { name: 'Transport', value: 10, color: '#10B981', icon: TruckIcon, trend: '-5%' },
-    { name: 'Entertainment', value: 10, color: '#F59E0B', icon: FilmIcon, trend: '+8%' },
-  ];
+    fetchAnalytics();
+  }, []);
 
-  // Spending habits
-  const habits = [
-    { title: 'Most Expensive Day', value: 'Friday', description: 'Average spending: ₹4,200', trend: '+15%' },
-    { title: 'Top Category', value: 'Food & Dining', description: '25% of total expenses', trend: '+12%' },
-    { title: 'Best Saving Day', value: 'Sunday', description: 'Average spending: ₹1,500', trend: '-20%' },
-    { title: 'Monthly Average', value: '₹16,250', description: 'Compared to ₹15,800 last month', trend: '+3%' },
-  ];
+  const getCategoryColors = (index: number) => {
+    const colors = ['#3B82F6', '#8B5CF6', '#EF4444', '#10B981', '#F59E0B', '#EC4899', '#14B8A6', '#F97316'];
+    return colors[index % colors.length];
+  };
 
-  // Comparison data
-  const comparisonData = [
-    { category: 'Food', you: 3250, average: 2800 },
-    { category: 'Shopping', you: 2500, average: 2200 },
-    { category: 'Transport', you: 1050, average: 1200 },
-    { category: 'Entertainment', you: 1200, average: 1500 },
-    { category: 'Bills', you: 8000, average: 7500 },
-  ];
+  // Use analytics data directly from backend
+  const monthlyData: {
+    month: string;
+    income: number;
+    expense: number;
+    net: number;
+  }[] = analytics?.monthly || [];
+  const categoryData: CategoryData[] = analytics?.categories || [];
+
+  // ===== Financial Health Core Logic =====
+
+  const totalIncome = monthlyData.reduce(
+    (sum: number, m) => sum + m.income,
+    0
+  );
+
+  const totalExpense = monthlyData.reduce(
+    (sum: number, m) => sum + m.expense,
+    0
+  );
+
+  const netSavings = totalIncome - totalExpense;
+
+  const savingsRate =
+    totalIncome > 0
+      ? parseFloat(
+          ((netSavings / totalIncome) * 100).toFixed(2)
+        )
+      : 0;
+
+  // Score based mainly on savings rate
+  let healthScore = 0;
+
+  if (savingsRate >= 40) healthScore = 95;
+  else if (savingsRate >= 30) healthScore = 85;
+  else if (savingsRate >= 20) healthScore = 75;
+  else if (savingsRate >= 10) healthScore = 60;
+  else if (savingsRate >= 0) healthScore = 45;
+  else healthScore = 25;
+
+  const roundedScore = Math.round(healthScore);
+
+  // Status label
+  let status = "";
+  let color = "";
+
+  if (roundedScore >= 85) {
+    status = "Excellent Financial Discipline";
+    color = "text-emerald-500";
+  } else if (roundedScore >= 70) {
+    status = "Healthy & Stable";
+    color = "text-green-500";
+  } else if (roundedScore >= 50) {
+    status = "Moderate Control";
+    color = "text-yellow-500";
+  } else {
+    status = "Needs Attention";
+    color = "text-red-500";
+  }
+
+  // Smart insight logic
+  const highestCategory = categoryData.length > 0
+    ? categoryData.reduce((prev: CategoryData, current: CategoryData) =>
+        prev.total > current.total ? prev : current
+      )
+    : null;
+
+  let insightMessage = "";
+
+  if (totalExpense > totalIncome) {
+    insightMessage = "Your expenses are higher than your income. Consider reducing discretionary spending.";
+  } else if (highestCategory) {
+    insightMessage = `Your highest spending category is ${highestCategory.category}. Monitor this category to optimize savings.`;
+  } else {
+    insightMessage = "You are managing your finances well. Keep tracking your expenses!";
+  }
+
+  const formattedMonthlyData = monthlyData.map((item: MonthlyData) => ({
+    month: item.month,
+    Income: item.income,
+    Expense: item.expense,
+    Net: item.income - item.expense
+  }));
+
+  if (!analytics) return <div>Loading analytics...</div>;
+  if (error) return <div className="p-6 text-red-500">{error}</div>;
 
   return (
-    <div className="space-y-8">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-800">Analytics</h1>
-          <p className="text-gray-600">Deep insights into your spending patterns</p>
-        </div>
-        
-        <div className="flex items-center space-x-4 mt-4 md:mt-0">
-          <div className="flex items-center space-x-2">
-            <CalendarIcon className="h-5 w-5 text-gray-400" />
-            <select 
-              className="input-field py-2"
-              value={timeRange}
-              onChange={(e) => setTimeRange(e.target.value)}
-            >
-              <option value="weekly">This Week</option>
-              <option value="monthly">This Month</option>
-              <option value="quarterly">Last 3 Months</option>
-              <option value="yearly">This Year</option>
-            </select>
+    <div className="p-8 bg-gray-50 min-h-screen">
+      <h1 className="text-3xl font-bold text-gray-800 mb-8">
+        Financial Analytics
+      </h1>
+
+      <div className="mb-10">
+        {/* Key Metrics */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-500">Total Income</p>
+                <p className="text-2xl font-bold text-blue-600 mt-2">₹{totalIncome.toLocaleString()}</p>
+              </div>
+            </div>
           </div>
           
-          <button className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center">
-            <svg className="h-5 w-5 mr-2 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+          <div className="bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-500">Total Expense</p>
+                <p className="text-2xl font-bold text-red-500 mt-2">₹{totalExpense.toLocaleString()}</p>
+              </div>
+            </div>
+          </div>
+          
+          <div className="bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-500">Net Savings</p>
+                <p className="text-2xl font-bold text-green-600 mt-2">₹{netSavings.toLocaleString()}</p>
+              </div>
+            </div>
+          </div>
+          
+          <div className="bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-500">Savings Rate</p>
+                <p className="text-2xl font-bold text-purple-600 mt-2">{savingsRate}%</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="mb-10">
+        {/* Main Charts Section */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* Income vs Expenses Chart */}
+          <div className="bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition">
+            <h2 className="text-lg font-semibold text-gray-800 mb-6">Income vs Expenses</h2>
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={formattedMonthlyData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+                  <XAxis dataKey="month" stroke="#6B7280" />
+                  <YAxis stroke="#6B7280" />
+                  <Tooltip 
+                    formatter={(value) => [`₹${value}`, 'Amount']}
+                    labelStyle={{ color: '#374151' }}
+                  />
+                  <Legend />
+                  <Bar dataKey="Income" name="Income" fill="#10B981" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="Expense" name="Expenses" fill="#EF4444" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="Net" name="Net" fill="#3B82F6" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition">
+            <h2 className="text-lg font-semibold text-gray-800 mb-6">Quick Summary</h2>
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <span className="text-gray-600">Total Income</span>
+                <span className="font-semibold text-blue-600">₹{totalIncome.toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-gray-600">Total Expense</span>
+                <span className="font-semibold text-red-500">₹{totalExpense.toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-gray-600">Net Savings</span>
+                <span className="font-semibold text-green-600">₹{netSavings.toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-gray-600">Savings Rate</span>
+                <span className="font-semibold text-purple-600">{savingsRate}%</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-2xl shadow-lg p-8 mb-8">
+        <div className="flex justify-between items-center">
+          <div>
+            <h2 className="text-xl font-semibold mb-3">
+              Financial Health Score
+            </h2>
+            <p className={`text-5xl font-bold ${color}`}>
+              {roundedScore}/100
+            </p>
+            <p className={`mt-2 font-medium ${color}`}>
+              {status}
+            </p>
+            <p className="text-gray-500 mt-3">
+              Savings Rate: {savingsRate}%
+            </p>
+            <p className="text-gray-500">
+              Net Savings: ₹{netSavings.toLocaleString()}
+            </p>
+          </div>
+          <div className="relative w-36 h-36">
+            <svg className="w-full h-full transform -rotate-90">
+              <circle
+                cx="72"
+                cy="72"
+                r="60"
+                stroke="#E5E7EB"
+                strokeWidth="12"
+                fill="none"
+              />
+              <circle
+                cx="72"
+                cy="72"
+                r="60"
+                stroke="currentColor"
+                strokeWidth="12"
+                fill="none"
+                strokeDasharray={2 * Math.PI * 60}
+                strokeDashoffset={
+                  2 * Math.PI * 60 *
+                  (1 - roundedScore / 100)
+                }
+                className={`${color} transition-all duration-700 ease-out`}
+              />
             </svg>
-            Export Report
-          </button>
-        </div>
-      </div>
-
-      {/* Key Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="card">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500">Avg. Monthly Spend</p>
-              <p className="text-2xl font-bold mt-2">₹16,250</p>
-              <div className="flex items-center mt-2">
-                <ArrowTrendingUpIcon className="h-4 w-4 text-green-500 mr-1" />
-                <span className="text-sm text-green-600">+3% from last month</span>
-              </div>
-            </div>
-            <div className="p-3 bg-blue-50 rounded-full">
-              <CurrencyDollarIcon className="h-6 w-6 text-blue-600" />
-            </div>
-          </div>
-        </div>
-        
-        <div className="card">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500">Savings Rate</p>
-              <p className="text-2xl font-bold mt-2">35%</p>
-              <div className="flex items-center mt-2">
-                <ArrowTrendingDownIcon className="h-4 w-4 text-red-500 mr-1" />
-                <span className="text-sm text-red-600">-2% from last month</span>
-              </div>
-            </div>
-            <div className="p-3 bg-green-50 rounded-full">
-              <ChartBarIcon className="h-6 w-6 text-green-600" />
-            </div>
-          </div>
-        </div>
-        
-        <div className="card">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500">Most Spent On</p>
-              <p className="text-2xl font-bold mt-2">Food & Dining</p>
-              <div className="flex items-center mt-2">
-                <ArrowTrendingUpIcon className="h-4 w-4 text-red-500 mr-1" />
-                <span className="text-sm text-red-600">12% above budget</span>
-              </div>
-            </div>
-            <div className="p-3 bg-purple-50 rounded-full">
-              <ShoppingBagIcon className="h-6 w-6 text-purple-600" />
-            </div>
-          </div>
-        </div>
-        
-        <div className="card">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500">Anomaly Frequency</p>
-              <p className="text-2xl font-bold mt-2">8.2%</p>
-              <div className="flex items-center mt-2">
-                <ArrowTrendingDownIcon className="h-4 w-4 text-green-500 mr-1" />
-                <span className="text-sm text-green-600">-15% from last month</span>
-              </div>
-            </div>
-            <div className="p-3 bg-red-50 rounded-full">
-              <svg className="h-6 w-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.998-.833-2.732 0L4.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-              </svg>
+            <div className="absolute inset-0 flex items-center justify-center text-lg font-semibold">
+              {roundedScore}%
             </div>
           </div>
         </div>
       </div>
 
-      {/* Main Charts Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Income vs Expenses Chart */}
-        <div className="card">
-          <h2 className="text-lg font-semibold text-gray-800 mb-6">Income vs Expenses</h2>
+      <div className="mb-10">
+        {/* Monthly Spending Pattern */}
+        <div className="bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition">
+          <h2 className="text-lg font-semibold text-gray-800 mb-6">Monthly Spending Pattern</h2>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={monthlyData}>
@@ -184,107 +312,45 @@ const Analytics: React.FC = () => {
                   labelStyle={{ color: '#374151' }}
                 />
                 <Legend />
-                <Bar dataKey="income" name="Income" fill="#10B981" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="expense" name="Expenses" fill="#EF4444" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="income" fill="#10B981" name="Income" />
+                <Bar dataKey="expense" fill="#EF4444" name="Expense" />
               </BarChart>
             </ResponsiveContainer>
           </div>
-          <p className="text-sm text-gray-500 mt-4">
-            Your expenses increased by 12% this month compared to last month
-          </p>
-        </div>
-
-        {/* Weekly Spending Pattern */}
-        <div className="card">
-          <h2 className="text-lg font-semibold text-gray-800 mb-6">Weekly Spending Pattern</h2>
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={weeklyData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-                <XAxis dataKey="day" stroke="#6B7280" />
-                <YAxis stroke="#6B7280" />
-                <Tooltip 
-                  formatter={(value) => [`₹${value}`, 'Amount']}
-                  labelStyle={{ color: '#374151' }}
-                />
-                <Line 
-                  type="monotone" 
-                  dataKey="amount" 
-                  stroke="#8B5CF6" 
-                  strokeWidth={3}
-                  dot={{ r: 4 }}
-                  activeDot={{ r: 6 }}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-          <p className="text-sm text-gray-500 mt-4">
-            You spend most on Fridays (₹4,200 average) and least on Sundays (₹1,500 average)
-          </p>
         </div>
       </div>
 
-      {/* Category Breakdown & Habits */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <div className="mb-10">
         {/* Category Breakdown */}
-        <div className="card">
-          <h2 className="text-lg font-semibold text-gray-800 mb-6">Category Breakdown</h2>
+        <div className="bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition">
+          <h2 className="text-lg font-semibold text-gray-800 mb-6">Expense Distribution by Category</h2>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
+              <PieChart width={400} height={300}>
                 <Pie
-                  data={categoryData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={60}
-                  outerRadius={80}
-                  paddingAngle={5}
-                  dataKey="value"
+                  data={analytics?.categories || []}
+                  dataKey="total"
+                  nameKey="category"
+                  outerRadius={100}
                   label
                 >
-                  {categoryData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  {analytics?.categories?.map((entry: CategoryData, index: number) => (
+                    <Cell key={`cell-${index}`} fill={getCategoryColors(index)} />
                   ))}
                 </Pie>
-                <Tooltip formatter={(value) => [`${value}%`, 'Percentage']} />
+                <Tooltip />
               </PieChart>
             </ResponsiveContainer>
           </div>
           <div className="mt-6 space-y-3">
-            {categoryData.map((category) => (
-              <div key={category.name} className="flex items-center justify-between">
+            {categoryData.map((category: CategoryData) => (
+              <div key={category.category} className="flex items-center justify-between">
                 <div className="flex items-center">
-                  <div className="w-3 h-3 rounded-full mr-3" style={{ backgroundColor: category.color }} />
-                  <span className="text-gray-700">{category.name}</span>
+                  <div className="w-3 h-3 rounded-full mr-3" style={{ backgroundColor: getCategoryColors(categoryData.indexOf(category)) }} />
+                  <span className="text-gray-700">{category.category}</span>
                 </div>
                 <div className="flex items-center">
-                  <span className="font-semibold mr-3">{category.value}%</span>
-                  <span className={`text-sm ${category.trend.startsWith('+') ? 'text-red-600' : category.trend.startsWith('-') ? 'text-green-600' : 'text-gray-600'}`}>
-                    {category.trend}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Spending Habits */}
-        <div className="card">
-          <h2 className="text-lg font-semibold text-gray-800 mb-6">Spending Habits</h2>
-          <div className="space-y-4">
-            {habits.map((habit) => (
-              <div key={habit.title} className="p-4 border border-gray-200 rounded-lg hover:border-primary-300 transition-colors">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <h3 className="font-medium text-gray-700">{habit.title}</h3>
-                    <p className="text-sm text-gray-500 mt-1">{habit.description}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-xl font-bold text-gray-800">{habit.value}</p>
-                    <p className={`text-sm mt-1 ${habit.trend.startsWith('+') ? 'text-red-600' : habit.trend.startsWith('-') ? 'text-green-600' : 'text-gray-600'}`}>
-                      {habit.trend} from average
-                    </p>
-                  </div>
+                  <span className="font-semibold mr-3">₹{category.total.toLocaleString()}</span>
                 </div>
               </div>
             ))}
@@ -292,71 +358,14 @@ const Analytics: React.FC = () => {
         </div>
       </div>
 
-      {/* Comparison with Average */}
-      <div className="card">
-        <h2 className="text-lg font-semibold text-gray-800 mb-6">Comparison with Student Average</h2>
-        <div className="h-64">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={comparisonData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-              <XAxis dataKey="category" stroke="#6B7280" />
-              <YAxis stroke="#6B7280" />
-              <Tooltip 
-                formatter={(value) => [`₹${value}`, 'Amount']}
-                labelStyle={{ color: '#374151' }}
-              />
-              <Legend />
-              <Bar dataKey="you" name="Your Spending" fill="#3B82F6" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="average" name="Student Average" fill="#9CA3AF" radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-        <div className="mt-6 p-4 bg-blue-50 rounded-lg">
-          <div className="flex items-start">
-            <svg className="h-5 w-5 text-blue-600 mr-3 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <div>
-              <h3 className="font-medium text-blue-900">Insight</h3>
-              <p className="text-blue-800 text-sm mt-1">
-                You spend 15% more on food & dining compared to other students. 
-                Consider setting a budget limit of ₹4,000 for this category.
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* AI Recommendations */}
-      <div className="card bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200">
-        <div className="flex items-start">
-          <div className="p-3 bg-blue-100 rounded-lg mr-4">
-            <svg className="h-6 w-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-            </svg>
-          </div>
-          <div className="flex-1">
-            <h3 className="font-semibold text-gray-800">AI Recommendations</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-              <div className="p-3 bg-white rounded-lg border">
-                <h4 className="font-medium text-gray-800">Reduce Food Spending</h4>
-                <p className="text-sm text-gray-600 mt-1">Limit dining out to twice a week, save ~₹2,000/month</p>
-              </div>
-              <div className="p-3 bg-white rounded-lg border">
-                <h4 className="font-medium text-gray-800">Optimize Transport</h4>
-                <p className="text-sm text-gray-600 mt-1">Use public transport 3 days/week, save ~₹800/month</p>
-              </div>
-              <div className="p-3 bg-white rounded-lg border">
-                <h4 className="font-medium text-gray-800">Weekend Spending</h4>
-                <p className="text-sm text-gray-600 mt-1">Friday & Saturday account for 45% of weekly expenses</p>
-              </div>
-              <div className="p-3 bg-white rounded-lg border">
-                <h4 className="font-medium text-gray-800">Savings Goal</h4>
-                <p className="text-sm text-gray-600 mt-1">Aim for 40% savings rate next month (currently 35%)</p>
-              </div>
-            </div>
-          </div>
-        </div>
+      {/* Smart Insight Section */}
+      <div className="bg-white rounded-xl shadow-md p-6 mt-10">
+        <h3 className="text-lg font-semibold text-gray-800 mb-3">
+          Smart Insight
+        </h3>
+        <p className="text-gray-600">
+          {insightMessage}
+        </p>
       </div>
     </div>
   );
