@@ -298,18 +298,7 @@ const Predictions: React.FC = () => {
         </div>
       </div>
 
-      <div className="text-center">
-        <button 
-          onClick={() => window.location.reload()}
-          className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center mx-auto"
-        >
-          <ArrowPathIcon className="h-5 w-5 mr-2" />
-          Refresh Predictions
-        </button>
-        <p className="text-sm text-gray-500 mt-2">
-          Predictions update automatically when you refresh page
-        </p>
-      </div>
+      
     </div>
   );
 };

@@ -220,7 +220,7 @@ const SidebarHeader: React.FC<{ logo?: React.ReactNode }> = ({ logo }) => {
           {!collapsed && (
             <div>
               <h1 className={`font-bold text-lg ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                Finance App
+                <h1>FinAI : Sentinel</h1>
               </h1>
               <p className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
                 Expense Tracker
