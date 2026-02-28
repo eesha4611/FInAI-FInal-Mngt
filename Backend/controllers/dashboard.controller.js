@@ -91,7 +91,8 @@ const getCategorySummaryController = async (req, res) => {
       total: parseFloat(item.total) || 0
     }));
 
-   console.log(`Category summary retrieved for user ${req.user?.id}:`, categories);
+   
+   console.log(`Category summary retrieved for user ${req.user?.id}:`, formattedSummary);
 
     
     res.json(formattedSummary);

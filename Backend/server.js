@@ -1,6 +1,9 @@
 require('dotenv').config();
+
 const express = require('express');
 const cors = require('cors');
+
+// Routes
 const healthRoutes = require('./routes/health.route');
 const messageRoutes = require('./routes/message.route');
 const authRoutes = require('./routes/auth.route');
@@ -19,41 +22,63 @@ console.log("✅ expenses routes loaded");
 console.log("✅ budget routes loaded");
 
 
+const analysisRoutes = require('./routes/analysisRoutes');
+const predictionRoutes = require('./routes/predictionRoutes');
+const recommendationRoutes = require('./routes/recommendationRoutes');
+const anomalyRoutes = require('./routes/anomalyRoutes');
+const ocrRoutes = require('./routes/ocrRoutes');
+const analyticsRoutes = require('./routes/analytics');
 
-// Import database connection AFTER dotenv is loaded
+
+// DB connections
 const db = require('./config/db');
-const sequelize = require('./models').sequelize;
-
-// Test MySQL connection
-db.getConnection()
-  .then(connection => {
-    console.log('✅ MySQL connected successfully');
-    connection.release();
-  })
-  .catch(err => {
-    console.error('❌ MySQL connection failed:', err);
-  });
-
-// Sync Sequelize models
-sequelize.sync({ force: false })
-  .then(() => {
-    console.log('✅ Sequelize models synced');
-  })
-  .catch(err => {
-    console.error('❌ Sequelize sync failed:', err);
-  });
+const { sequelize } = require('./models');
 
 const app = express();
 const PORT = process.env.PORT || 5001;
 
-// Middleware
+console.log("✅ category summary route loaded");
+
+
+// =======================
+// 🔌 DATABASE CONNECTION
+// =======================
+
+// Test MySQL pool connection
+db.getConnection()
+  .then(conn => {
+    console.log('✅ MySQL connected successfully');
+    conn.release();
+  })
+  .catch(err => {
+    console.error('❌ MySQL connection failed:', err.message);
+  });
+
+// ✅ SAFE SYNC (does NOT delete data)
+sequelize.sync({ alter: false })
+  .then(() => {
+    console.log('✅ Sequelize models synced');
+  })
+  .catch(err => {
+    console.error('❌ Sequelize sync failed:', err.message);
+  });
+
+
+// =======================
+// 🧩 MIDDLEWARE
+// =======================
 app.use(cors());
 app.use(express.json());
 
-// Routes
+
+// =======================
+// 🚀 ROUTES
+// =======================
+
 app.use('/api', healthRoutes);
 app.use('/api', messageRoutes);
-app.use('/api/auth', require('./routes/auth.route'));
+
+app.use('/api/auth', authRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/expenses', expensesRoutes);
@@ -61,21 +86,18 @@ app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/transactions', transactionRoutes);
 app.use('/api/transactions', categorySummaryRoutes);
 app.use('/api/insights', insightsRoutes);
-const analysisRoutes = require('./routes/analysisRoutes');
 app.use('/api/analysis', analysisRoutes);
-const predictionRoutes = require('./routes/predictionRoutes');
 app.use('/api/predictions', predictionRoutes);
-const recommendationRoutes = require('./routes/recommendationRoutes');
 app.use('/api/recommendations', recommendationRoutes);
-const anomalyRoutes = require('./routes/anomalyRoutes');
 app.use('/api/anomalies', anomalyRoutes);
-const ocrRoutes = require('./routes/ocrRoutes');
 app.use('/api/ocr', ocrRoutes);
-const analyticsRoutes = require('./routes/analytics');
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/budget', budgetRoutes);
 
-// ✅ 404 handler (NO wildcard, this is the fix)
+
+// =======================
+// ❌ 404 HANDLER
+// =======================
 app.use((req, res) => {
   res.status(404).json({
     success: false,
@@ -84,44 +106,36 @@ app.use((req, res) => {
   });
 });
 
-// ✅ Global error handler (must be last)
+
+// =======================
+// 🛑 GLOBAL ERROR HANDLER
+// =======================
 app.use((err, req, res, next) => {
-  // Log error for debugging
-  console.error('❌ Server Error:', {
-    message: err.message,
-    stack: err.stack,
-    url: req.originalUrl,
-    method: req.method,
-    timestamp: new Date().toISOString()
-  });
+  console.error('❌ Server Error:', err);
 
-  // Don't expose sensitive database errors
+  let status = 500;
   let message = 'Internal server error';
-  let statusCode = 500;
 
-  // Handle specific error types
   if (err.name === 'ValidationError') {
+    status = 400;
     message = 'Validation failed';
-    statusCode = 400;
-  } else if (err.code === 'ER_DUP_ENTRY') {
+  }
+  else if (err.code === 'ER_DUP_ENTRY') {
+    status = 409;
     message = 'Duplicate entry';
-    statusCode = 409;
-  } else if (err.code === 'ER_NO_REFERENCED_ROW_2') {
-    message = 'Referenced record not found';
-    statusCode = 400;
-  } else if (err.code === 'ER_BAD_NULL_ERROR') {
-    message = 'Required field is missing';
-    statusCode = 400;
   }
 
-  res.status(statusCode).json({
+  res.status(status).json({
     success: false,
     message,
     data: null
   });
 });
 
-// Start server
+
+// =======================
+// ▶️ START SERVER
+// =======================
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log(`🚀 Server running on port ${PORT}`);
 });

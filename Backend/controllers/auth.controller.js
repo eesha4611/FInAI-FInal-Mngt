@@ -1,30 +1,28 @@
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const db = require('../config/db');
+const { User } = require('../models');
 
-const signup = async (req, res) => {
-  const { email, password } = req.body;
-  let connection;
 
-  // Basic validation
-  if (!email || !password) {
-    return res.status(400).json({
-      success: false,
-      message: 'Email and password are required',
-      data: null
-    });
-  }
-
+// =======================
+// 🟢 SIGNUP
+// =======================
+exports.signup = async (req, res) => {
   try {
-    connection = await db.getConnection();
-    
-    // Check if user already exists
-    const [existingUsers] = await connection.execute(
-      'SELECT id FROM users WHERE email = ?',
-      [email]
-    );
-    
-    if (existingUsers.length > 0) {
+    const { email, password } = req.body;
+
+    // check missing fields
+    if (!email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email and password required',
+        data: null
+      });
+    }
+
+    // check if user exists
+    const existingUser = await User.findOne({ where: { email } });
+
+    if (existingUser) {
       return res.status(409).json({
         success: false,
         message: 'User already exists',
@@ -32,93 +30,55 @@ const signup = async (req, res) => {
       });
     }
 
-    // Hash password
+    // hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Create new user
-    const [result] = await connection.execute(
-      'INSERT INTO users (email, password) VALUES (?, ?)',
-      [email, hashedPassword]
-    );
+    // create user
+    const user = await User.create({
+      email,
+      password: hashedPassword
+    });
 
-    console.log(`✅ User created: ${email} (ID: ${result.insertId})`);
-
-    res.status(201).json({
+    return res.status(201).json({
       success: true,
-      message: 'User created successfully',
+      message: 'User registered successfully',
       data: {
-        user: {
-          id: result.insertId,
-          email: email,
-          createdAt: new Date().toISOString()
-        }
+        id: user.id,
+        email: user.email
       }
     });
+
   } catch (error) {
-    console.error('❌ Signup error:', error);
-    res.status(500).json({
+    console.error('Signup error:', error);
+    return res.status(500).json({
       success: false,
-      message: 'Internal server error',
+      message: 'Signup failed',
       data: null
     });
-  } finally {
-    if (connection) connection.release();
   }
 };
 
-const login = async (req, res) => {
-  const { email, password } = req.body;
-  let connection;
 
-  // Basic validation
-  if (!email || !password) {
-    return res.status(400).json({
-      success: false,
-      message: 'Email and password are required',
-      data: null
-    });
-  }
-
+// =======================
+// 🔵 LOGIN
+// =======================
+exports.login = async (req, res) => {
   try {
-    connection = await db.getConnection();
-    
-    // Find user with proper error handling
-    let users;
-    try {
-      [users] = await connection.execute(
-        'SELECT id, email, password FROM users WHERE email = ?',
-        [email]
-      );
-    } catch (queryError) {
-      console.error('❌ Database query error:', {
-        error: queryError.message,
-        code: queryError.code,
-        errno: queryError.errno,
-        sqlState: queryError.sqlState,
-        sql: queryError.sql,
-        email: email
-      });
-      
-      // In development, send detailed error info
-      const errorResponse = {
+    const { email, password } = req.body;
+
+    // validate body
+    if (!email || !password) {
+      return res.status(400).json({
         success: false,
-        message: 'Database error occurred',
+        message: 'Email and password required',
         data: null
-      };
-      
-      if (process.env.NODE_ENV === 'development') {
-        errorResponse.details = {
-          error: queryError.message,
-          code: queryError.code,
-          errno: queryError.errno
-        };
-      }
-      
-      return res.status(500).json(errorResponse);
+      });
     }
-    
-    if (users.length === 0) {
-      console.log(`❌ Login failed: User not found - ${email}`);
+
+    // find user
+    const user = await User.findOne({ where: { email } });
+
+    if (!user) {
       return res.status(400).json({
         success: false,
         message: 'Invalid credentials',
@@ -126,36 +86,10 @@ const login = async (req, res) => {
       });
     }
 
-    const user = users[0];
+    // compare password
+    const isMatch = await bcrypt.compare(password, user.password);
 
-    // Compare password with proper error handling
-    let isPasswordValid;
-    try {
-      isPasswordValid = await bcrypt.compare(password, user.password);
-    } catch (bcryptError) {
-      console.error('❌ Password comparison error:', {
-        error: bcryptError.message,
-        email: email,
-        userId: user.id
-      });
-      
-      const errorResponse = {
-        success: false,
-        message: 'Authentication error',
-        data: null
-      };
-      
-      if (process.env.NODE_ENV === 'development') {
-        errorResponse.details = {
-          error: bcryptError.message
-        };
-      }
-      
-      return res.status(500).json(errorResponse);
-    }
-    
-    if (!isPasswordValid) {
-      console.log(`❌ Login failed: Invalid password - ${email}`);
+    if (!isMatch) {
       return res.status(400).json({
         success: false,
         message: 'Invalid credentials',
@@ -163,98 +97,43 @@ const login = async (req, res) => {
       });
     }
 
-    // Generate JWT token with error handling
-    let token;
-    try {
-      token = jwt.sign(
-        { 
-          id: user.id, 
-          email: user.email 
-        },
-        process.env.JWT_SECRET || 'fallback-secret-key',
-        { expiresIn: '1h' }
-      );
-    } catch (jwtError) {
-      console.error('❌ JWT token generation error:', {
-        error: jwtError.message,
-        email: email,
-        userId: user.id
-      });
-      
-      const errorResponse = {
-        success: false,
-        message: 'Token generation error',
-        data: null
-      };
-      
-      if (process.env.NODE_ENV === 'development') {
-        errorResponse.details = {
-          error: jwtError.message
-        };
-      }
-      
-      return res.status(500).json(errorResponse);
-    }
+    // generate token
+    const token = jwt.sign(
+      { id: user.id, email: user.email },
+      process.env.JWT_SECRET || 'secret',
+      { expiresIn: '1d' }
+    );
 
-    console.log(`✅ User logged in: ${email} (ID: ${user.id})`);
-
-    res.json({
+    return res.json({
       success: true,
       message: 'Login successful',
       data: {
+        token,
         user: {
           id: user.id,
-          email: user.email,
-          createdAt: new Date().toISOString()
-        },
-        token: token
+          email: user.email
+        }
       }
     });
+
   } catch (error) {
-    // Catch-all error handler for unexpected errors
-    console.error('❌ Unexpected login error:', {
-      error: error.message,
-      stack: error.stack,
-      email: email,
-      timestamp: new Date().toISOString()
-    });
-    
-    const errorResponse = {
+    console.error('Login error:', error);
+    return res.status(500).json({
       success: false,
-      message: 'Internal server error',
+      message: 'Login failed',
       data: null
-    };
-    
-    if (process.env.NODE_ENV === 'development') {
-      errorResponse.details = {
-        error: error.message,
-        stack: error.stack
-      };
-    }
-    
-    res.status(500).json(errorResponse);
-  } finally {
-    // Ensure connection is always released, even if errors occur
-    try {
-      if (connection) connection.release();
-    } catch (releaseError) {
-      console.error('❌ Connection release error:', releaseError.message);
-    }
+    });
   }
 };
 
-const logout = (req, res) => {
-  // Since we're using stateless JWT tokens, we can't invalidate them on the server
-  // The client should remove the token from their storage (localStorage, cookies, etc.)
+
+// =======================
+// 🔴 LOGOUT (optional)
+// =======================
+exports.logout = (req, res) => {
   res.json({
     success: true,
-    message: 'Logged out successfully. Please clear token on client.',
+    message: 'Logged out',
     data: null
   });
-};
-
-module.exports = {
-  signup,
-  login,
-  logout
 };

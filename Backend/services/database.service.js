@@ -36,9 +36,12 @@ const createTransaction = async (userId, amount, type, category, description) =>
   const connection = await db.getConnection();
   try {
     const [result] = await connection.execute(
-      'INSERT INTO transactions (user_id, amount, type, category, description) VALUES (?, ?, ?, ?, ?)',
+      `INSERT INTO transactions 
+      (user_id, amount, type, category, description, created_at, updated_at) 
+      VALUES (?, ?, ?, ?, ?, NOW(), NOW())`,
       [userId, amount, type, category, description]
     );
+
     return {
       id: result.insertId,
       userId,
