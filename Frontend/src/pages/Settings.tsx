@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Cog6ToothIcon,
@@ -9,6 +9,7 @@ import {
   EyeSlashIcon,
   ArrowRightOnRectangleIcon
 } from '@heroicons/react/24/outline';
+import budgetService from '../services/budget.service';
 
 const Settings: React.FC = () => {
   const navigate = useNavigate(); // ✅ For navigation
@@ -20,6 +21,8 @@ const Settings: React.FC = () => {
     weeklyReport: true,
   });
   const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [saveMessage, setSaveMessage] = useState('');
 
   // Budget settings with reactive state
   const [budgets, setBudgets] = useState({
@@ -28,6 +31,10 @@ const Settings: React.FC = () => {
     transport: 2000,
     entertainment: 1500,
     rent: 8000,
+    bills: 4000,
+    healthcare: 2000,
+    education: 3000,
+    other: 1500
   });
 
   const [monthlyBudget, setMonthlyBudget] = useState(25000);
@@ -40,7 +47,50 @@ const Settings: React.FC = () => {
     { key: 'transport', name: 'Transport', current: 1050 },
     { key: 'entertainment', name: 'Entertainment', current: 1200 },
     { key: 'rent', name: 'Rent', current: 8000 },
+    { key: 'bills', name: 'Bills & Utilities', current: 3500 },
+    { key: 'healthcare', name: 'Healthcare', current: 1800 },
+    { key: 'education', name: 'Education', current: 2200 },
+    { key: 'other', name: 'Other', current: 1200 }
   ];
+// Budget exceeded alerts
+const exceededBudgets = categoryData
+  .map((category) => {
+    const budget = budgets[category.key as keyof typeof budgets];
+    const spent = category.current;
+
+    if (spent > budget) {
+      return {
+        name: category.name,
+        exceededBy: spent - budget
+      };
+    }
+
+    return null;
+  })
+  .filter(Boolean);
+  // Load budget settings when component mounts
+  useEffect(() => {
+    const loadBudgetSettings = async () => {
+      try {
+        const response = await budgetService.getBudgetSettings();
+        if (response.success && response.data) {
+         setMonthlyBudget(Number(response.data.monthlyBudget));
+
+setBudgets(prev => ({
+  ...prev,
+  ...response.data.categoryBudgets
+}));
+
+setNotifyAt(Number(response.data.alertThreshold));
+          console.log('Budget settings loaded:', response.data);
+        }
+      } catch (error) {
+        console.error('Error loading budget settings:', error);
+      }
+    };
+
+    loadBudgetSettings();
+  }, []);
 
   // Privacy settings
   const privacySettings = [
@@ -74,8 +124,55 @@ const Settings: React.FC = () => {
     console.log(`Toggled ${id}`);
   };
 
-  const handleBudgetUpdate = () => {
-    alert('Budget settings updated!');
+  const handleBudgetUpdate = async () => {
+    setIsLoading(true);
+    setSaveMessage('');
+    
+    try {
+      const budgetData = {
+        monthlyBudget,
+        categoryBudgets: budgets,
+        alertThreshold: notifyAt
+      };
+
+      console.log('Sending budget data:', JSON.stringify(budgetData, null, 2));
+
+      const response = await budgetService.saveBudgetSettings(budgetData);
+      
+      console.log('Budget save response:', response);
+      
+      if (response.success) {
+        // Store exceeded budgets in localStorage for notifications
+        if (exceededBudgets.length > 0) {
+          localStorage.setItem(
+            "budgetAlerts",
+            JSON.stringify(exceededBudgets)
+          );
+        }
+        
+        setSaveMessage('Budget settings updated successfully!');
+        console.log('Budget settings saved:', budgetData);
+      } else {
+        setSaveMessage(response.message || 'Failed to update budget settings');
+        console.error('Budget save failed:', response);
+      }
+    } catch (error: any) {
+      console.error('Error saving budget settings:', error);
+      setSaveMessage(error.response?.data?.message || error.message || 'Error updating budget settings');
+      
+      // More detailed error logging
+      if (error.response) {
+        console.error('Response error:', error.response.status, error.response.data);
+      } else if (error.request) {
+        console.error('Request error:', error.request);
+      } else {
+        console.error('General error:', error.message);
+      }
+    } finally {
+      setIsLoading(false);
+      // Clear message after 3 seconds
+      setTimeout(() => setSaveMessage(''), 3000);
+    }
   };
 
   const handleBudgetChange = (category: string, value: number) => {
@@ -169,7 +266,16 @@ const Settings: React.FC = () => {
                 <div className="space-y-4">
                   {categoryData.map((category) => {
                     const budget = budgets[category.key as keyof typeof budgets];
-                    const percent = (category.current / budget) * 100;
+                    const percentage = (category.current / budget) * 100;
+                    
+                    // Dynamic color warnings
+                    let barColor = "bg-green-500";
+                    if (percentage >= 70 && percentage < 90) {
+                      barColor = "bg-orange-500";
+                    }
+                    if (percentage >= 90) {
+                      barColor = "bg-red-500";
+                    }
                     
                     return (
                       <div key={category.key} className="flex items-center justify-between">
@@ -182,11 +288,8 @@ const Settings: React.FC = () => {
                           </div>
                           <div className="w-full bg-gray-200 rounded-full h-2">
                             <div 
-                              className={`h-2 rounded-full ${
-                                percent > 0.9 ? 'bg-red-500' :
-                                percent > 0.7 ? 'bg-yellow-500' : 'bg-green-500'
-                              }`}
-                              style={{ width: `${Math.min(percent, 100)}%` }}
+                              className={`h-2 rounded-full ${barColor}`}
+                              style={{ width: `${Math.min(percentage, 100)}%` }}
                             />
                           </div>
                         </div>
@@ -203,8 +306,21 @@ const Settings: React.FC = () => {
               </div>
               
               <div className="pt-6 border-t border-gray-200">
-                <button onClick={handleBudgetUpdate} className="btn-primary">
-                  Update Budget Settings
+                {saveMessage && (
+                  <div className={`mb-4 p-3 rounded-lg text-sm ${
+                    saveMessage.includes('successfully') 
+                      ? 'bg-green-100 text-green-700 border border-green-200' 
+                      : 'bg-red-100 text-red-700 border border-red-200'
+                  }`}>
+                    {saveMessage}
+                  </div>
+                )}
+                <button 
+                  onClick={handleBudgetUpdate} 
+                  disabled={isLoading}
+                  className={`btn-primary ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                  {isLoading ? 'Updating...' : 'Update Budget Settings'}
                 </button>
               </div>
             </div>

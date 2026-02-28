@@ -2,6 +2,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom'; // ✅ ADD THIS
 import { useAuth } from '../../context/AuthContext';
+import NotificationDropdown from '../NotificationDropdown';
 
 export interface NavbarProps {
   onSidebarToggle?: () => void;
@@ -25,19 +26,11 @@ const Navbar: React.FC<NavbarProps> = ({
   showSearch = true,
 }) => {
   const { user } = useAuth(); // Get user from AuthContext
-  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const notificationsRef = useRef<HTMLDivElement>(null);
   const userMenuRef = useRef<HTMLDivElement>(null);
   
   const navigate = useNavigate(); // ✅ ADD THIS
-
-  const notifications = [
-    { id: 1, title: 'New message', description: 'You have a new message', time: '5 min ago', read: false },
-    { id: 2, title: 'System update', description: 'System maintenance scheduled', time: '1 hour ago', read: false },
-    { id: 3, title: 'Payment received', description: 'Your payment has been processed', time: '2 hours ago', read: true },
-  ];
 
   const userMenuItems = [
     { label: 'Profile', icon: '👤' },
@@ -50,19 +43,16 @@ const Navbar: React.FC<NavbarProps> = ({
   // Close dropdowns when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (notificationsRef.current && !notificationsRef.current.contains(event.target as Node)) {
-        setIsNotificationsOpen(false);
-      }
       if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
         setIsUserMenuOpen(false);
       }
     };
 
     document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
   }, []);
-
-  const unreadCount = notifications.filter(n => !n.read).length;
 
   // ✅ ADD THIS LOGOUT FUNCTION
   const handleLogout = () => {
@@ -149,58 +139,7 @@ const Navbar: React.FC<NavbarProps> = ({
 
             {/* Notifications */}
             {showNotifications && (
-              <div className="relative" ref={notificationsRef}>
-                <button
-                  onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
-                  className="p-2 rounded-lg hover:bg-gray-100 relative"
-                  aria-label="Notifications"
-                >
-                  <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-                  </svg>
-                  {unreadCount > 0 && (
-                    <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">
-                      {unreadCount > 9 ? '9+' : unreadCount}
-                    </span>
-                  )}
-                </button>
-
-                {/* Notifications dropdown */}
-                {isNotificationsOpen && (
-                  <div className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-xl border border-gray-200 z-50">
-                    <div className="p-4 border-b">
-                      <div className="flex justify-between items-center">
-                        <h3 className="font-semibold">Notifications</h3>
-                        {unreadCount > 0 && (
-                          <button className="text-sm text-blue-600 hover:text-blue-800">
-                            Mark all as read
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                    <div className="max-h-96 overflow-y-auto">
-                      {notifications.map((note) => (
-                        <div
-                          key={note.id}
-                          className={`p-4 border-b hover:bg-gray-50 ${!note.read ? 'bg-blue-50' : ''}`}
-                        >
-                          <div className="flex justify-between">
-                            <p className="font-medium">{note.title}</p>
-                            {!note.read && <div className="w-2 h-2 bg-blue-500 rounded-full"></div>}
-                          </div>
-                          <p className="text-sm text-gray-600 mt-1">{note.description}</p>
-                          <p className="text-xs text-gray-500 mt-2">{note.time}</p>
-                        </div>
-                      ))}
-                    </div>
-                    <div className="p-3 text-center border-t">
-                      <a href="/notifications" className="text-sm text-blue-600 hover:text-blue-800">
-                        View all notifications
-                      </a>
-                    </div>
-                  </div>
-                )}
-              </div>
+              <NotificationDropdown />
             )}
 
             {/* User menu */}

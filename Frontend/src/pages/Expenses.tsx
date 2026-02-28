@@ -44,7 +44,7 @@ const Expenses: React.FC = () => {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
 
-  const limit = 10;
+  const limit = 100000;
 
   const fetchExpensesData = useCallback(async () => {
   try {

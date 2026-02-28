@@ -3,11 +3,19 @@ import {
   ExclamationTriangleIcon,
   CheckCircleIcon,
   XCircleIcon,
+  MagnifyingGlassIcon,
+  FunnelIcon,
   ArrowPathIcon,
   EyeIcon,
-  FlagIcon
+  FlagIcon,
+  InformationCircleIcon
 } from '@heroicons/react/24/outline';
+import { 
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, 
+  ResponsiveContainer, Cell 
+} from 'recharts';
 import axios from 'axios';
+import useRefreshData from '../hooks/useRefreshData';
 
 interface Anomaly {
   id: number;
@@ -23,9 +31,12 @@ interface AnomalyData {
 }
 
 const Anomalies: React.FC = () => {
+  const [filter, setFilter] = useState('all');
+  const [selectedAnomaly, setSelectedAnomaly] = useState<number | null>(null);
   const [anomalyData, setAnomalyData] = useState<AnomalyData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { registerRefreshCallbacks } = useRefreshData();
 
   useEffect(() => {
     const fetchAnomalies = async () => {
@@ -41,12 +52,12 @@ const Anomalies: React.FC = () => {
           }
         });
 
-        if (response.data) {
-          setAnomalyData(response.data);
+        if (response.data.success && response.data.data) {
+          setAnomalyData(response.data.data);
         }
-      } catch (err) {
+      } catch (err: any) {
         console.error('Error fetching anomalies:', err);
-        setError('Failed to load anomaly data');
+        setError('Failed to load anomaly detection results');
       } finally {
         setLoading(false);
       }
@@ -92,30 +103,38 @@ const Anomalies: React.FC = () => {
     );
   }
 
-  const anomalies = anomalyData?.anomalies || [];
-  const totalTransactionsChecked = anomalyData?.totalTransactionsChecked || 0;
+  if (!anomalyData) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-lg text-gray-600">No anomaly data available</div>
+      </div>
+    );
+  }
+
+  const { totalTransactionsChecked, anomalies } = anomalyData;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-800">Anomaly Detection</h1>
           <p className="text-gray-600">AI-powered detection of unusual spending patterns</p>
         </div>
+        
         <div className="flex items-center space-x-4 mt-4 md:mt-0">
           <button className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center">
             <ArrowPathIcon className="h-5 w-5 mr-2 text-gray-600" />
-            Refresh
+            Refresh Detection
           </button>
           <button className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 flex items-center">
             <FlagIcon className="h-5 w-5 mr-2" />
-            Report Issue
+            Report False Positive
           </button>
         </div>
       </div>
 
-      {/* Stats Cards */}
+      {/* Stats Overview */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <div className="card">
           <div className="flex items-center justify-between">
@@ -132,7 +151,7 @@ const Anomalies: React.FC = () => {
             </div>
           </div>
         </div>
-
+        
         <div className="card">
           <div className="flex items-center justify-between">
             <div>
@@ -148,16 +167,16 @@ const Anomalies: React.FC = () => {
             </div>
           </div>
         </div>
-
+        
         <div className="card">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-500">Detection Rate</p>
               <p className="text-2xl font-bold mt-2">
                 {totalTransactionsChecked > 0 
-                  ? `${((anomalies.length / totalTransactionsChecked) * 100).toFixed(1)}%`
-                  : '0%'
-                }
+                  ? ((anomalies.length / totalTransactionsChecked) * 100).toFixed(1)
+                  : '0'
+                }%
               </p>
               <div className="flex items-center mt-2">
                 <ArrowPathIcon className="h-4 w-4 text-purple-500 mr-1" />
@@ -169,7 +188,7 @@ const Anomalies: React.FC = () => {
             </div>
           </div>
         </div>
-
+        
         <div className="card">
           <div className="flex items-center justify-between">
             <div>
@@ -224,7 +243,7 @@ const Anomalies: React.FC = () => {
                     <div className="flex items-center space-x-3 mb-2">
                       <ExclamationTriangleIcon className="h-5 w-5 text-red-500" />
                       <h3 className="font-semibold text-gray-800">
-                        Unusual {anomaly.category} Transaction
+                        {anomaly.category} Anomaly
                       </h3>
                       <span className={`px-2 py-1 text-xs font-medium rounded-full ${
                         anomaly.amount > 2000 
@@ -272,7 +291,19 @@ const Anomalies: React.FC = () => {
         )}
       </div>
 
-      
+      {/* Refresh Button */}
+      <div className="text-center">
+        <button 
+          onClick={() => window.location.reload()}
+          className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center mx-auto"
+        >
+          <ArrowPathIcon className="h-5 w-5 mr-2" />
+          Refresh Anomaly Detection
+        </button>
+        <p className="text-sm text-gray-500 mt-2">
+          Anomaly detection updates automatically when you refresh the page
+        </p>
+      </div>
     </div>
   );
 };

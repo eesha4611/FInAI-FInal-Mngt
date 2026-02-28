@@ -11,10 +11,12 @@ const categorySummaryRoutes = require('./routes/category-summary.route');
 const insightsRoutes = require('./routes/insightsRoutes');
 const userRoutes = require('./routes/userRoutes');
 const expensesRoutes = require('./routes/expensesRoutes');
+const budgetRoutes = require('./routes/budget-complex');
 console.log("✅ category summary route loaded");
 console.log("✅ insights routes loaded");
 console.log("✅ user routes loaded");
 console.log("✅ expenses routes loaded");
+console.log("✅ budget routes loaded");
 
 
 
@@ -71,6 +73,7 @@ const ocrRoutes = require('./routes/ocrRoutes');
 app.use('/api/ocr', ocrRoutes);
 const analyticsRoutes = require('./routes/analytics');
 app.use('/api/analytics', analyticsRoutes);
+app.use('/api/budget', budgetRoutes);
 
 // ✅ 404 handler (NO wildcard, this is the fix)
 app.use((req, res) => {
