@@ -210,25 +210,25 @@ const Analytics: React.FC = () => {
       <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-6">
         
         {/* Total Revenue */}
-        <div className="bg-green-50 border border-green-200 rounded-2xl shadow-sm p-5 transition hover:shadow-md">
+        <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-5 transition hover:shadow-md">
           <p className="text-xs uppercase tracking-wide text-gray-500 mb-2">Total Revenue</p>
-          <p className="text-2xl font-semibold text-green-700">
+          <p className="text-2xl font-semibold text-gray-900">
             ₹{totalIncome.toLocaleString()}
           </p>
         </div>
 
         {/* Total Spending */}
-        <div className="bg-red-50 border border-red-200 rounded-2xl shadow-sm p-5 transition hover:shadow-md">
+        <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-5 transition hover:shadow-md">
           <p className="text-xs uppercase tracking-wide text-gray-500 mb-2">Total Spending</p>
-          <p className="text-2xl font-semibold text-red-700">
+          <p className="text-2xl font-semibold text-gray-900">
             ₹{totalExpense.toLocaleString()}
           </p>
         </div>
 
         {/* Net Savings */}
-        <div className={`${netSavings >= 0 ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'} rounded-2xl shadow-sm p-5 transition hover:shadow-md`}>
+        <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-5 transition hover:shadow-md">
           <p className="text-xs uppercase tracking-wide text-gray-500 mb-2">Net Savings</p>
-          <p className={`text-2xl font-semibold ${netSavings >= 0 ? 'text-green-700' : 'text-red-700'}`}>
+          <p className="text-2xl font-semibold text-gray-900">
             ₹{netSavings.toLocaleString()}
           </p>
         </div>
