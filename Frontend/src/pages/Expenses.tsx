@@ -3,9 +3,6 @@ import TransactionForm from '../components/TransactionForm';
 import transactionService from '../services/transaction.service';
 import {
   PlusIcon,
-  MagnifyingGlassIcon,
-  CalendarIcon,
-  ReceiptPercentIcon,
   EllipsisHorizontalIcon,
   XMarkIcon
 } from '@heroicons/react/24/outline';
@@ -36,10 +33,7 @@ const Expenses: React.FC = () => {
 
   const [showAddExpenseModal, setShowAddExpenseModal] = useState(false);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-
   const [selectedCategory, setSelectedCategory] = useState("All");
-  const [selectedMonth, setSelectedMonth] = useState("");
-  const [searchQuery, setSearchQuery] = useState("");
 
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -55,14 +49,6 @@ const Expenses: React.FC = () => {
 
     if (selectedCategory !== "All") {
       params.set("category", selectedCategory);
-    }
-
-    if (selectedMonth) {
-      params.set("month", selectedMonth);
-    }
-
-    if (searchQuery) {
-      params.set("search", searchQuery);
     }
 
     const response: any = await transactionService.getTransactions(
@@ -88,13 +74,13 @@ const Expenses: React.FC = () => {
   } catch (error) {
     console.error("Expenses fetch error:", error);
   }
-}, [selectedCategory, selectedMonth, searchQuery, page]);
+}, [selectedCategory, page]);
 
   useEffect(() => {
 
     setPage(1);
 
-  }, [selectedCategory, selectedMonth, searchQuery]);
+  }, [selectedCategory]);
 
   useEffect(() => {
 
@@ -136,48 +122,9 @@ console.log("FILTERED TRANSACTIONS:", filteredTransactions);
       </div>
 
       <div className="card">
-
-        <div className="flex flex-col md:flex-row md:items-center justify-between space-y-4 md:space-y-0">
-
-          <div className="relative flex-1 max-w-md">
-
-            <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-
-            <input
-              type="text"
-              placeholder="Search expenses..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="input-field pl-10"
-            />
-
-          </div>
-
-          <div className="flex items-center space-x-4">
-
-            <CalendarIcon className="h-5 w-5 text-gray-400" />
-
-            <select
-              value={selectedMonth}
-              onChange={(e) => setSelectedMonth(e.target.value)}
-              className="input-field py-2"
-            >
-
-              <option value="">All Time</option>
-              <option value="2026-02">February 2026</option>
-              <option value="2026-01">January 2026</option>
-              <option value="2025-12">December 2025</option>
-
-            </select>
-
-          </div>
-
-        </div>
-
+        {/* Category Filters - Moved to Top */}
         <div className="flex space-x-2 mt-6 overflow-x-auto pb-2">
-
           {CATEGORIES.map((category) => (
-
             <button
               key={category}
               onClick={() => setSelectedCategory(category)}
@@ -189,11 +136,8 @@ console.log("FILTERED TRANSACTIONS:", filteredTransactions);
             >
               {category}
             </button>
-
           ))}
-
         </div>
-
       </div>
 
       <div className="card">

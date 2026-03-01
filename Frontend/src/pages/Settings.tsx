@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Cog6ToothIcon,
-  BellIcon,
   CreditCardIcon,
   ShieldCheckIcon,
   EyeIcon,
@@ -142,16 +141,31 @@ setNotifyAt(Number(response.data.alertThreshold));
       console.log('Budget save response:', response);
       
       if (response.success) {
-        // Store exceeded budgets in localStorage for notifications
+        // Generate notifications from exceeded budgets
+        const exceededBudgets = categoryData
+          .map((category) => {
+            const budget = budgets[category.key as keyof typeof budgets];
+            const spent = category.current;
+
+            if (spent > budget) {
+              return {
+                name: category.name,
+                exceededBy: spent - budget
+              };
+            }
+
+            return null;
+          })
+          .filter(Boolean);
+
+        // Store notifications for display in navbar
         if (exceededBudgets.length > 0) {
-          localStorage.setItem(
-            "budgetAlerts",
-            JSON.stringify(exceededBudgets)
-          );
+          localStorage.setItem("budgetAlerts", JSON.stringify(exceededBudgets));
         }
         
         setSaveMessage('Budget settings updated successfully!');
         console.log('Budget settings saved:', budgetData);
+        console.log('Generated notifications:', exceededBudgets);
       } else {
         setSaveMessage(response.message || 'Failed to update budget settings');
         console.error('Budget save failed:', response);
@@ -405,7 +419,9 @@ setNotifyAt(Number(response.data.alertThreshold));
           {/* Notifications */}
           <div className="card">
             <div className="flex items-center mb-6">
-              <BellIcon className="h-6 w-6 text-gray-600 mr-2" />
+              <div className="h-6 w-6 text-gray-600 mr-2 flex items-center justify-center">
+                🔔
+              </div>
               <h2 className="text-lg font-semibold text-gray-800">Notifications</h2>
             </div>
             

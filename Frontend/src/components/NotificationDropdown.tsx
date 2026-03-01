@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { BellIcon } from '@heroicons/react/24/outline';
 import NotificationItem from './NotificationItem';
 
 interface Alert {
@@ -8,97 +7,94 @@ interface Alert {
 }
 
 const NotificationDropdown: React.FC = () => {
-  const [isOpen, setIsOpen] = useState(false);
-  const [alerts, setAlerts] = useState<Alert[]>([]);
+  const [notifications, setNotifications] = useState<any[]>([]);
 
-  // Load alerts from localStorage on mount
+  // Load notifications from localStorage on mount and when they change
   useEffect(() => {
-    const storedAlerts = localStorage.getItem('budgetAlerts');
-    if (storedAlerts) {
+    const loadNotifications = () => {
       try {
-        const parsedAlerts = JSON.parse(storedAlerts);
-        setAlerts(parsedAlerts);
+        const storedAlerts = localStorage.getItem('budgetAlerts');
+        if (storedAlerts) {
+          const alerts = JSON.parse(storedAlerts);
+          // Convert alerts to notification format
+          const formattedNotifications = alerts.map((alert: Alert) => ({
+            type: "budget",
+            title: "Budget Alert",
+            message: `${alert.name} exceeded budget by ₹${alert.exceededBy.toLocaleString()}`,
+            time: "Just now"
+          }));
+          setNotifications(formattedNotifications);
+        } else {
+          setNotifications([]);
+        }
       } catch (error) {
         console.error('Error parsing budget alerts:', error);
+        setNotifications([]);
       }
-    }
+    };
+
+    loadNotifications();
+    
+    // Listen for storage changes to update in real-time
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'notifications' || e.key === 'budgetAlerts') {
+        loadNotifications();
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    
+    // Also check periodically for immediate updates
+    const interval = setInterval(loadNotifications, 1000);
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      clearInterval(interval);
+    };
   }, []);
 
-  // Clear alerts when dropdown is opened (optional - you can keep them if you want)
-  const handleOpen = () => {
-    setIsOpen(true);
-  };
-
-  const handleClose = () => {
-    setIsOpen(false);
-  };
-
-  const clearAlerts = () => {
-    setAlerts([]);
+  const clearNotifications = () => {
     localStorage.removeItem('budgetAlerts');
+    localStorage.removeItem('notifications');
+    setNotifications([]);
   };
 
   return (
-    <div className="relative">
-      {/* Bell Icon */}
-      <button
-        onClick={handleOpen}
-        className="relative p-2 text-gray-600 hover:text-gray-900 transition-colors"
-      >
-        <BellIcon className="h-5 w-5" />
-        {alerts.length > 0 && (
-          <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
-        )}
-      </button>
+    <div className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
+      {/* Header */}
+      <div className="px-4 py-3 border-b border-gray-200">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-gray-900">Notifications</h3>
+          {notifications.length > 0 && (
+            <button
+              onClick={clearNotifications}
+              className="text-xs text-gray-500 hover:text-gray-700 transition-colors"
+            >
+              Clear All
+            </button>
+          )}
+        </div>
+      </div>
 
-      {/* Dropdown */}
-      {isOpen && (
-        <>
-          {/* Backdrop */}
-          <div 
-            className="fixed inset-0 z-40" 
-            onClick={handleClose}
-          ></div>
-          
-          {/* Dropdown Content */}
-          <div className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
-            {/* Header */}
-            <div className="px-4 py-3 border-b border-gray-200">
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-gray-900">Notifications</h3>
-                {alerts.length > 0 && (
-                  <button
-                    onClick={clearAlerts}
-                    className="text-xs text-gray-500 hover:text-gray-700 transition-colors"
-                  >
-                    Clear All
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {/* Notifications List */}
-            <div className="max-h-96 overflow-y-auto">
-              {alerts.length === 0 ? (
-                <div className="px-4 py-6 text-center text-sm text-gray-500">
-                  No budget alerts
-                </div>
-              ) : (
-                <div className="py-2">
-                  {alerts.map((alert, index) => (
-                    <NotificationItem
-                      key={index}
-                      title="Budget Alert"
-                      message={`${alert.name} exceeded budget by ₹${alert.exceededBy.toLocaleString()}`}
-                      time="Just now"
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
+      {/* Notifications List */}
+      <div className="max-h-96 overflow-y-auto">
+        {notifications.length === 0 ? (
+          <div className="px-4 py-6 text-center text-sm text-gray-500">
+            No budget alerts
           </div>
-        </>
-      )}
+        ) : (
+          <div className="py-2">
+            {notifications.map((notification, index) => (
+              <NotificationItem
+                key={index}
+                title={notification.title}
+                message={notification.message}
+                time={notification.time}
+              />
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 };

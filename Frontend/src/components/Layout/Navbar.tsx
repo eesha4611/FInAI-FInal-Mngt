@@ -2,7 +2,8 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-
+import { BellIcon } from '@heroicons/react/24/outline';
+import NotificationDropdown from "../NotificationDropdown";
 interface NavbarProps {
   onSidebarToggle?: () => void;
   isSidebarCollapsed?: boolean;
@@ -22,6 +23,8 @@ const Navbar: React.FC<NavbarProps> = ({
   const navigate = useNavigate();
 
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [isNotificationOpen, setIsNotificationOpen] = useState(false);
+  const [notificationCount, setNotificationCount] = useState(0);
   const [searchQuery, setSearchQuery] = useState("");
 
   const userMenuRef = useRef<HTMLDivElement>(null);
@@ -58,7 +61,40 @@ const Navbar: React.FC<NavbarProps> = ({
       window.removeEventListener("profileUpdated", handleProfileUpdate);
   }, []);
 
-  // 🔹 Close dropdown when clicking outside
+  // 🔹 Update notification count
+  useEffect(() => {
+    const updateNotificationCount = () => {
+      try {
+        const stored = localStorage.getItem("budgetAlerts");
+        const alerts = stored ? JSON.parse(stored) : [];
+        setNotificationCount(alerts.length);
+      } catch (error) {
+        console.error('Error parsing budget alerts:', error);
+        setNotificationCount(0);
+      }
+    };
+
+    updateNotificationCount();
+    
+    // Listen for storage changes
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'notifications' || e.key === 'budgetAlerts') {
+        updateNotificationCount();
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    
+    // Check periodically for immediate updates
+    const interval = setInterval(updateNotificationCount, 1000);
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      clearInterval(interval);
+    };
+  }, []);
+
+  // 🔹 Close dropdowns when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
@@ -66,6 +102,11 @@ const Navbar: React.FC<NavbarProps> = ({
         !userMenuRef.current.contains(event.target as Node)
       ) {
         setIsUserMenuOpen(false);
+      }
+      // Close notification dropdown when clicking outside
+      const notificationElement = document.querySelector('[data-notification-dropdown]');
+      if (notificationElement && !notificationElement.contains(event.target as Node)) {
+        setIsNotificationOpen(false);
       }
     };
 
@@ -114,8 +155,34 @@ const Navbar: React.FC<NavbarProps> = ({
           )}
         </div>
 
-        {/* RIGHT SIDE */}
-        <div className="flex items-center gap-4">
+{/* RIGHT SIDE */}
+<div className="flex items-center gap-4">
+
+  {/* NOTIFICATION BELL */}
+  {showNotifications && (
+    <div className="relative">
+      <button
+        className="relative p-2 rounded-full hover:bg-gray-100"
+        onClick={() => setIsNotificationOpen(!isNotificationOpen)}
+      >
+        <BellIcon className="h-6 w-6 text-gray-600" />
+
+        {/* notification indicator */}
+        {notificationCount > 0 && (
+          <span className="absolute top-1 right-1 h-2 w-2 bg-red-500 rounded-full"></span>
+        )}
+      </button>
+
+      {isNotificationOpen && (
+        <div className="absolute right-0 mt-2 w-80 z-50" data-notification-dropdown>
+          <NotificationDropdown />
+        </div>
+      )}
+    </div>
+  )}
+
+  {/* USER MENU */}
+  <div className="relative" ref={userMenuRef}></div>
 
           {/* USER MENU */}
           <div className="relative" ref={userMenuRef}>
