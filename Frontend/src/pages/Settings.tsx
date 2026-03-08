@@ -2,18 +2,28 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Cog6ToothIcon,
-  CreditCardIcon,
   ShieldCheckIcon,
   EyeIcon,
   EyeSlashIcon,
   ArrowRightOnRectangleIcon
 } from '@heroicons/react/24/outline';
-import budgetService from '../services/budget.service';
-import { useMonth } from '../contexts/MonthContext';
+import { useBudget } from '../context/BudgetContext';
+import { useExpenseFilter } from '../context/ExpenseFilterContext';
 
 const Settings: React.FC = () => {
-  const navigate = useNavigate(); // ✅ For navigation
-  const { categoryTotals } = useMonth();
+  const navigate = useNavigate();
+  const { 
+    monthlyBudget, 
+    setMonthlyBudget, 
+    categoryBudgets, 
+    setCategoryBudgets,
+    updateBudget, 
+    expenses
+  } = useBudget();
+  
+  // Use global filter context
+  const { selectedMonth, selectedYear } = useExpenseFilter();
+  
   const [notifications, setNotifications] = useState({
     email: true,
     push: true,
@@ -22,91 +32,15 @@ const Settings: React.FC = () => {
     weeklyReport: true,
   });
   const [showPassword, setShowPassword] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
-  const [categoryData, setCategoryData] = useState([
-    { key: 'food', name: 'Food & Dining', current: 0 },
-    { key: 'shopping', name: 'Shopping', current: 0 },
-    { key: 'transport', name: 'Transport', current: 0 },
-    { key: 'entertainment', name: 'Entertainment', current: 0 },
-    { key: 'rent', name: 'Rent', current: 0 },
-    { key: 'bills', name: 'Bills & Utilities', current: 0 },
-    { key: 'healthcare', name: 'Healthcare', current: 0 },
-    { key: 'education', name: 'Education', current: 0 },
-    { key: 'other', name: 'Other', current: 0 }
-  ]);
-
-useEffect(() => {
-  setCategoryData([
-    { key: "food", name: "Food & Dining", current: categoryTotals["food & dining"] || 0 },
-    { key: "shopping", name: "Shopping", current: categoryTotals["shopping"] || 0 },
-    { key: "transport", name: "Transport", current: categoryTotals["transport"] || 0 },
-    { key: "entertainment", name: "Entertainment", current: categoryTotals["entertainment"] || 0 },
-    { key: "rent", name: "Rent", current: categoryTotals["rent"] || 0 },
-    { key: "bills", name: "Bills & Utilities", current: categoryTotals["bills"] || 0 },
-    { key: "healthcare", name: "Healthcare", current: categoryTotals["healthcare"] || 0 },
-    { key: "education", name: "Education", current: categoryTotals["education"] || 0 },
-    { key: "other", name: "Other", current: categoryTotals["other"] || 0 }
-  ]);
-}, [categoryTotals]);
-  const [budgets, setBudgets] = useState({
-    food: 5000,
-    shopping: 3000,
-    transport: 2000,
-    entertainment: 1500,
-    rent: 8000,
-    bills: 4000,
-    healthcare: 2000,
-    education: 3000,
-    other: 1500
-  });
-
-  const [monthlyBudget, setMonthlyBudget] = useState(25000);
   const [notifyAt, setNotifyAt] = useState(80);
 
-  // Load budget settings when component mounts
-  useEffect(() => {
-    const loadBudgetSettings = async () => {
-      try {
-        const response = await budgetService.getBudgetSettings();
-        if (response.success && response.data) {
-         setMonthlyBudget(Number(response.data.monthlyBudget));
-
-setBudgets(prev => ({
-  ...prev,
-  ...response.data.categoryBudgets
-}));
-
-setNotifyAt(Number(response.data.alertThreshold));
-          console.log('Budget settings loaded:', response.data);
-        }
-      } catch (error) {
-        console.error('Error loading budget settings:', error);
-      }
-    };
-
-    loadBudgetSettings();
-  }, []);
-
-  // Privacy settings
   const privacySettings = [
     { id: 'dataCollection', label: 'Allow data collection for AI improvements', enabled: true },
     { id: 'analytics', label: 'Share anonymous usage analytics', enabled: true },
     { id: 'peerComparison', label: 'Compare my spending with peers (anonymous)', enabled: false },
     { id: 'autoBackup', label: 'Auto-backup data to cloud', enabled: true },
   ];
-
-  // ✅ Logout function
-  const handleLogout = () => {
-    // Clear user data from localStorage
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    
-    // Redirect to login page
-    navigate('/login');
-    
-    console.log('Logged out successfully');
-  };
 
   const handleNotificationToggle = (key: keyof typeof notifications) => {
     setNotifications(prev => ({
@@ -120,78 +54,71 @@ setNotifyAt(Number(response.data.alertThreshold));
     console.log(`Toggled ${id}`);
   };
 
-  const handleBudgetUpdate = async () => {
-    setIsLoading(true);
-    setSaveMessage('');
+  const handleLogout = () => {
+    // Clear user data from localStorage
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
     
-    try {
-      const budgetData = {
-        monthlyBudget,
-        categoryBudgets: budgets,
-        alertThreshold: notifyAt
-      };
-
-      console.log('Sending budget data:', JSON.stringify(budgetData, null, 2));
-
-      const response = await budgetService.saveBudgetSettings(budgetData);
-      
-      console.log('Budget save response:', response);
-      
-      if (response.success) {
-        // Generate notifications for exceeded budgets
-        const saveExceededBudgets = categoryData
-          .map((category) => {
-            const budget = budgets[category.key as keyof typeof budgets];
-            const spent = category.current;
-
-            if (spent > budget) {
-              return {
-                name: category.name,
-                exceededBy: spent - budget
-              };
-            }
-
-            return null;
-          })
-          .filter(Boolean);
-
-        // Store notifications for display in navbar
-        if (saveExceededBudgets.length > 0) {
-          localStorage.setItem("budgetAlerts", JSON.stringify(saveExceededBudgets));
-        }
-        
-        setSaveMessage('Budget settings updated successfully!');
-        console.log('Budget settings saved:', budgetData);
-        console.log('Generated notifications:', saveExceededBudgets);
-      } else {
-        setSaveMessage(response.message || 'Failed to update budget settings');
-        console.error('Budget save failed:', response);
-      }
-    } catch (error: any) {
-      console.error('Error saving budget settings:', error);
-      setSaveMessage(error.response?.data?.message || error.message || 'Error updating budget settings');
-      
-      // More detailed error logging
-      if (error.response) {
-        console.error('Response error:', error.response.status, error.response.data);
-      } else if (error.request) {
-        console.error('Request error:', error.request);
-      } else {
-        console.error('General error:', error.message);
-      }
-    } finally {
-      setIsLoading(false);
-      // Clear message after 3 seconds
-      setTimeout(() => setSaveMessage(''), 3000);
-    }
+    // Redirect to login page
+    navigate('/login');
+    
+    console.log('Logged out successfully');
   };
 
-  const handleBudgetChange = (category: string, value: number) => {
-    setBudgets(prev => ({
+  const saveBudgetSettings = async () => {
+    const success = await updateBudget({
+      monthlyBudget,
+      categoryBudgets
+    });
+    
+    if (success) {
+      setSaveMessage('Budget updated successfully');
+    } else {
+      setSaveMessage('Failed to update budget');
+    }
+    setTimeout(() => setSaveMessage(''), 3000);
+  };
+
+  const handleCategoryBudgetChange = (category: string, value: number) => {
+    setCategoryBudgets((prev: Record<string, number>) => ({
       ...prev,
       [category]: value
     }));
   };
+
+  const getMonthlyCategorySpent = (category: string) => {
+    console.log("SETTINGS EXPENSES:", expenses);
+    console.log("FILTER:", selectedMonth, selectedYear);
+    
+    if (!expenses) return 0;
+    
+    return expenses
+      .filter(e => {
+        // Use the correct date field - try both possible field names
+        const dateField = e.date || e.createdAt || e.created_at;
+        if (!dateField) {
+          console.log("No date field found for expense:", e);
+          return false;
+        }
+        const expenseDate = new Date(dateField);
+        console.log("Checking expense:", e.category, dateField, expenseDate.getMonth(), expenseDate.getFullYear());
+        return (
+          e.category === category &&
+          selectedMonth !== null &&
+          selectedYear !== null &&
+          expenseDate.getMonth() === selectedMonth &&
+          expenseDate.getFullYear() === selectedYear
+        );
+      })
+      .reduce((sum, e) => sum + e.amount, 0);
+  };
+
+  // Force recalculation when filters change
+  useEffect(() => {
+    console.log("Recalculating category budgets...");
+    console.log("Current filter:", selectedMonth, selectedYear);
+    console.log("Expenses available:", expenses?.length || 0);
+  }, [expenses, selectedMonth, selectedYear]);
 
   return (
     <div className="space-y-8">
@@ -210,128 +137,159 @@ setNotifyAt(Number(response.data.alertThreshold));
         {/* Left Column - Account Settings */}
         <div className="lg:col-span-2 space-y-8">
           {/* Budget Settings */}
-          <div className="card">
-            <div className="flex items-center mb-6">
-              <CreditCardIcon className="h-6 w-6 text-gray-600 mr-2" />
-              <h2 className="text-lg font-semibold text-gray-800">Budget Settings</h2>
+          <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-8">
+            <div className="mb-8">
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">Budget Settings</h2>
+              <p className="text-gray-600">Manage your monthly spending limits and category budgets</p>
             </div>
             
-            <div className="space-y-6">
+            <div className="space-y-8">
+              {/* Monthly Budget Section */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-semibold text-gray-800 mb-3">
                   Monthly Budget
                 </label>
-                <div className="flex items-center">
-                  <span className="p-2 border border-r-0 border-gray-300 rounded-l-lg bg-gray-50 text-gray-600">
-                    ₹
-                  </span>
+                <div className="relative max-w-md">
+                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                    <span className="text-gray-500 text-lg font-medium">₹</span>
+                  </div>
                   <input
                     type="number"
                     value={monthlyBudget}
                     onChange={(e) => setMonthlyBudget(Number(e.target.value))}
-                    className="input-field rounded-l-none"
+                    className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 text-lg font-medium"
+                    placeholder="Enter amount"
                   />
                 </div>
-                <p className="text-sm text-gray-500 mt-2">
-                  Set your total monthly spending limit
+                <p className="text-sm text-gray-500 mt-3">
+                  Set your total monthly spending limit.
                 </p>
               </div>
               
+              {/* Budget Alert Threshold */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Notify me when budget reaches
+                <label className="block text-sm font-semibold text-gray-800 mb-3">
+                  Budget Alert Threshold
                 </label>
-                <div className="flex items-center space-x-4">
-                  <div className="flex-1">
-                    <input
-                      type="range"
-                      min="50"
-                      max="100"
-                      value={notifyAt}
-                      onChange={(e) => setNotifyAt(Number(e.target.value))}
-                      className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-                    />
-                    <div className="flex justify-between text-xs text-gray-500 mt-1">
-                      <span>50%</span>
-                      <span>60%</span>
-                      <span>70%</span>
-                      <span>80%</span>
-                      <span>90%</span>
-                      <span>100%</span>
-                    </div>
-                  </div>
-                  <div className="w-16">
-                    <input
-                      type="number"
-                      value={notifyAt}
-                      onChange={(e) => setNotifyAt(Number(e.target.value))}
-                      className="input-field text-center"
-                    />
-                  </div>
-                  <span className="text-gray-600">%</span>
+                <div className="flex flex-wrap gap-3">
+                  {[50, 60, 70, 80, 90, 100].map((threshold) => (
+                    <button
+                      key={threshold}
+                      onClick={() => setNotifyAt(threshold)}
+                      className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
+                        notifyAt === threshold
+                          ? 'bg-blue-600 text-white shadow-md transform scale-105'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                      title="Receive notification when spending reaches this percentage of your budget."
+                    >
+                      {threshold}%
+                    </button>
+                  ))}
                 </div>
+                <p className="text-sm text-gray-500 mt-3">
+                  Receive notification when spending reaches this percentage of your budget.
+                </p>
               </div>
               
+              {/* Category Budgets */}
               <div>
-                <h3 className="font-medium text-gray-700 mb-4">Category Budgets</h3>
-                <div className="space-y-4">
-                  {categoryData.map((category) => {
-                    const budget = budgets[category.key as keyof typeof budgets];
-                    const percentage = (category.current / budget) * 100;
+                <h3 className="text-sm font-semibold text-gray-800 mb-4">Category Budgets</h3>
+                <div className="space-y-3">
+                  {[
+                    { key: 'food', name: 'Food & Dining' },
+                    { key: 'shopping', name: 'Shopping' },
+                    { key: 'transport', name: 'Transport' },
+                    { key: 'entertainment', name: 'Entertainment' },
+                    { key: 'bills', name: 'Bills & Utilities' },
+                    { key: 'healthcare', name: 'Healthcare' },
+                    { key: 'education', name: 'Education' },
+                    { key: 'other', name: 'Other' }
+                  ].map((category) => {
+                    const budget = categoryBudgets[category.key] || 0;
+                    const spent = getMonthlyCategorySpent(category.key);
+                    const percentage = budget > 0 ? (spent / budget) * 100 : 0;
                     
-                    // Dynamic color warnings
-                    let barColor = "bg-green-500";
-                    if (percentage >= 70 && percentage < 90) {
-                      barColor = "bg-orange-500";
-                    }
-                    if (percentage >= 90) {
-                      barColor = "bg-red-500";
+                    // Progress bar color logic
+                    let progressColor = 'bg-green-500';
+                    if (percentage >= 100) {
+                      progressColor = 'bg-red-500';
+                    } else if (percentage >= 70) {
+                      progressColor = 'bg-orange-500';
                     }
                     
                     return (
-                      <div key={category.key} className="flex items-center justify-between">
-                        <div className="flex-1">
-                          <div className="flex justify-between text-sm mb-1">
-                            <span className="font-medium text-gray-700">{category.name}</span>
-                            <span className="text-gray-600">
-                              ₹{category.current} / ₹{budget}
-                            </span>
-                          </div>
-                          <div className="w-full bg-gray-200 rounded-full h-2">
-                            <div 
-                              className={`h-2 rounded-full ${barColor}`}
-                              style={{ width: `${Math.min(percentage, 100)}%` }}
+                      <div key={category.key} className="bg-white border border-gray-200 rounded-lg p-4">
+                        <div className="flex items-center justify-between mb-2">
+                          <h4 className="font-semibold text-gray-800">{category.name}</h4>
+                          <div className="relative w-32">
+                            <div className="absolute inset-y-0 left-2 pl-3 flex items-center pointer-events-none">
+                              <span className="text-gray-500 text-sm">₹</span>
+                            </div>
+                            <input
+                              type="number"
+                              value={budget}
+                              onChange={(e) => handleCategoryBudgetChange(category.key, Number(e.target.value))}
+                              className="w-full pl-7 pr-2 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm font-medium"
+                              placeholder="0"
                             />
                           </div>
                         </div>
-                        <input
-                          type="number"
-                          value={budget}
-                          onChange={(e) => handleBudgetChange(category.key, Number(e.target.value))}
-                          className="ml-4 w-24 input-field"
-                        />
+                        <div className="text-sm text-gray-600 mb-2">
+                          ₹{spent.toFixed(0)} spent / ₹{budget.toFixed(0)} budget
+                        </div>
+                        
+                        {/* Progress Bar */}
+                        <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+                          <div 
+                            className={`h-full transition-all duration-400 ease-out ${progressColor}`}
+                            style={{ width: `${Math.min(percentage, 100)}%` }}
+                          />
+                        </div>
+                        
+                        {/* Category Budget Warning */}
+                        {spent > budget && budget > 0 && (
+                          <div className="mt-2 flex items-center text-amber-600 text-xs">
+                            <span className="mr-1">⚠</span>
+                            <span>Budget exceeded</span>
+                          </div>
+                        )}
                       </div>
                     );
                   })}
                 </div>
+                
+                {/* Category Total Indicator */}
+                <div className="mt-6 p-4 bg-gray-50 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-gray-700">Total Category Budgets:</span>
+                    <span className="text-lg font-bold text-gray-900">₹{Object.values(categoryBudgets).reduce((sum, budget) => sum + budget, 0)}</span>
+                  </div>
+                  {Object.values(categoryBudgets).reduce((sum, budget) => sum + budget, 0) > monthlyBudget && monthlyBudget > 0 && (
+                    <div className="mt-3 flex items-center text-amber-600 text-sm">
+                      <span className="mr-2">⚠</span>
+                      <span>Category budgets exceed monthly budget</span>
+                    </div>
+                  )}
+                </div>
               </div>
               
+              {/* Save Button */}
               <div className="pt-6 border-t border-gray-200">
                 {saveMessage && (
-                  <div className={`mb-4 p-3 rounded-lg text-sm ${
+                  <div className={`mb-4 p-4 rounded-lg text-sm font-medium ${
                     saveMessage.includes('successfully') 
-                      ? 'bg-green-100 text-green-700 border border-green-200' 
-                      : 'bg-red-100 text-red-700 border border-red-200'
+                      ? 'bg-green-50 text-green-700 border border-green-200' 
+                      : 'bg-red-50 text-red-700 border border-red-200'
                   }`}>
                     {saveMessage}
                   </div>
                 )}
                 <button 
-                  onClick={handleBudgetUpdate} 
-                  disabled={isLoading}
-                  className={`btn-primary ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  onClick={saveBudgetSettings} 
+                  className="px-8 py-3 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 focus:ring-4 focus:ring-blue-500 focus:ring-opacity-50 transition-all duration-200 transform hover:scale-[1.02] active:scale-[0.98]"
                 >
-                  {isLoading ? 'Updating...' : 'Update Budget Settings'}
+                  Save Budget Settings
                 </button>
               </div>
             </div>

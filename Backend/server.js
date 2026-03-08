@@ -15,6 +15,7 @@ const insightsRoutes = require('./routes/insightsRoutes');
 const userRoutes = require('./routes/userRoutes');
 const expensesRoutes = require('./routes/expensesRoutes');
 const budgetRoutes = require('./routes/budget-complex');
+const budgetTestRoutes = require('./routes/budget-test');
 
 const analysisRoutes = require('./routes/analysisRoutes');
 const predictionRoutes = require('./routes/predictionRoutes');
@@ -82,6 +83,7 @@ app.use('/api/anomalies', anomalyRoutes);
 app.use('/api/ocr', ocrRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/budget', budgetRoutes);
+app.use('/api/budget-test', budgetTestRoutes);
 
 
 // =======================

@@ -17,10 +17,15 @@ async function apiRequest(endpoint: string, options: RequestInit = {}) {
 }
 
 export const dashboardService = {
-  async getDashboardData() {
-    return apiRequest("/dashboard", { method: "GET" });
+  async getDashboardData(month?: string | null, year?: string | null) {
+    let endpoint = "/dashboard";
+    
+    if (month && year) {
+      endpoint += `?month=${month}&year=${year}`;
+    }
+    
+    return apiRequest(endpoint, { method: "GET" });
   }
 };
 
 export default dashboardService;
- 

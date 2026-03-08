@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import TransactionForm from '../components/TransactionForm';
 import transactionService from '../services/transaction.service';
+import { useExpenseFilter } from '../context/ExpenseFilterContext';
 import {
   PlusIcon,
   EllipsisHorizontalIcon,
@@ -35,9 +36,14 @@ const Expenses: React.FC = () => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [selectedCategory, setSelectedCategory] = useState("All");
   
-  // Initialize filters with null values for "All Time"
-  const [month, setMonth] = useState<string | null>(null);
-  const [year, setYear] = useState<string | null>(null);
+  // Use global filter context
+  const {
+    selectedMonth,
+    setSelectedMonth,
+    selectedYear,
+    setSelectedYear
+  } = useExpenseFilter();
+  
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
 
@@ -45,8 +51,8 @@ const Expenses: React.FC = () => {
     try {
       let url = "/api/transactions?page=1&limit=100000";
 
-      if (month !== null && year !== null) {
-        url += `&month=${month}&year=${year}`;
+      if (selectedMonth !== null && selectedYear !== null) {
+        url += `&month=${selectedMonth + 1}&year=${selectedYear}`;
       }
 
       console.log('Fetching transactions from:', url);
@@ -89,9 +95,9 @@ const Expenses: React.FC = () => {
 
   // Refetch when filters change
   useEffect(() => {
-    console.log('Filters changed, fetching transactions...', { month, year, selectedCategory });
+    console.log('Filters changed, fetching transactions...', { selectedMonth, selectedYear, selectedCategory });
     fetchTransactions();
-  }, [month, year, selectedCategory]);
+  }, [selectedMonth, selectedYear, selectedCategory]);
 
   const filteredTransactions = (transactions || []).filter((t) => {
     if (t.type !== "expense") return false;
@@ -106,18 +112,32 @@ const Expenses: React.FC = () => {
   };
 
   const getFilterLabel = () => {
-    if (month === null && year === null) {
+    if (selectedMonth === null && selectedYear === null) {
       return "All Transactions";
-    } else if (month !== null && year !== null) {
-      const monthName = new Date(2024, parseInt(month) - 1).toLocaleString('default', { month: 'long' });
-      return `${monthName} ${year} Transactions`;
-    } else if (month !== null) {
-      const monthName = new Date(2024, parseInt(month) - 1).toLocaleString('default', { month: 'long' });
+    } else if (selectedMonth !== null && selectedYear !== null) {
+      const monthName = new Date(2024, selectedMonth).toLocaleString('default', { month: 'long' });
+      return `${monthName} ${selectedYear} Transactions`;
+    } else if (selectedMonth !== null) {
+      const monthName = new Date(2024, selectedMonth).toLocaleString('default', { month: 'long' });
       return `${monthName} Transactions`;
-    } else if (year !== null) {
-      return `${year} Transactions`;
+    } else if (selectedYear !== null) {
+      return `${selectedYear} Transactions`;
     }
     return "All Transactions";
+  };
+
+  const handleMonthChange = (value: string) => {
+    const processedValue = value === "" ? null : parseInt(value) - 1;
+    console.log("Expenses page - Month changed to:", processedValue);
+    setSelectedMonth(processedValue);
+    setPage(1);
+  };
+
+  const handleYearChange = (value: string) => {
+    const yearValue = value === "" ? null : parseInt(value);
+    console.log("Expenses page - Year changed to:", yearValue);
+    setSelectedYear(yearValue);
+    setPage(1);
   };
 
   return (
@@ -162,12 +182,8 @@ const Expenses: React.FC = () => {
             <CalendarIcon className="h-5 w-5 text-gray-400" />
             <label className="text-sm font-medium text-gray-700">Month:</label>
             <select
-              value={month || ""}
-              onChange={(e) => {
-                const value = e.target.value === "" ? null : e.target.value;
-                setMonth(value);
-                setPage(1);
-              }}
+              value={selectedMonth !== null ? selectedMonth + 1 : ""}
+              onChange={(e) => handleMonthChange(e.target.value)}
               className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             >
               <option value="">All Time</option>
@@ -189,12 +205,8 @@ const Expenses: React.FC = () => {
           <div className="flex items-center space-x-2">
             <label className="text-sm font-medium text-gray-700">Year:</label>
             <select
-              value={year || ""}
-              onChange={(e) => {
-                const value = e.target.value === "" ? null : e.target.value;
-                setYear(value);
-                setPage(1);
-              }}
+              value={selectedYear || ""}
+              onChange={(e) => handleYearChange(e.target.value)}
               className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             >
               <option value="">All Time</option>

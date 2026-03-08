@@ -81,14 +81,33 @@ const getBudgetSettings = async (userId) => {
     }
     
     const settings = rows[0];
+    
+    // Try to get category budgets from JSON column first, fallback to individual columns
+    let categoryBudgets;
+    if (settings.category_budgets && (typeof settings.category_budgets === 'string' || typeof settings.category_budgets === 'object')) {
+      categoryBudgets = typeof settings.category_budgets === "string"
+        ? JSON.parse(settings.category_budgets)
+        : settings.category_budgets;
+    } else {
+      // Fallback to individual columns
+      categoryBudgets = {
+        food: settings.food_dining || 0,
+        shopping: settings.shopping || 0,
+        transport: settings.transport || 0,
+        entertainment: settings.entertainment || 0,
+        rent: settings.rent || 0,
+        bills: settings.bills_utilities || 0,
+        healthcare: settings.healthcare || 0,
+        education: settings.education || 0,
+        other: settings.other || 0
+      };
+    }
+    
     return {
-  monthlyBudget: settings.monthly_budget,
-  categoryBudgets:
-    typeof settings.category_budgets === "string"
-      ? JSON.parse(settings.category_budgets)
-      : settings.category_budgets,
-  alertThreshold: settings.alert_threshold
-};
+      monthlyBudget: settings.monthly_budget,
+      categoryBudgets: categoryBudgets,
+      alertThreshold: settings.alert_threshold
+    };
   } catch (error) {
     console.error('Error fetching budget settings:', error);
     throw error;

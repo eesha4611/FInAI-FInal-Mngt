@@ -3,6 +3,8 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { MonthProvider } from './contexts/MonthContext';
+import { BudgetProvider } from './context/BudgetContext';
+import { ExpenseFilterProvider } from './context/ExpenseFilterContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import Layout from './components/Layout/Layout';
 
@@ -66,9 +68,13 @@ const App: React.FC = () => {
   return (
     <Router>
       <AuthProvider>
-        <MonthProvider>
-          <AppRoutes />
-        </MonthProvider>
+        <ExpenseFilterProvider>
+          <MonthProvider>
+            <BudgetProvider>
+              <AppRoutes />
+            </BudgetProvider>
+          </MonthProvider>
+        </ExpenseFilterProvider>
       </AuthProvider>
       <Toaster />
     </Router>

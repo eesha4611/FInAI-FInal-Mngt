@@ -8,9 +8,15 @@ import useRefreshData from '../hooks/useRefreshData';
 
 // Inline insights service
 const insightsService = {
-  getInsights: async () => {
+  getInsights: async (month?: string | null, year?: string | null) => {
     const token = localStorage.getItem('token');
-    const response = await axios.get('http://localhost:5001/api/insights', {
+    let url = 'http://localhost:5001/api/insights';
+    
+    if (month && year) {
+      url += `?month=${month}&year=${year}`;
+    }
+    
+    const response = await axios.get(url, {
       headers: {
         Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json'
@@ -41,6 +47,16 @@ const Dashboard = () => {
  
   const formRef = useRef<HTMLDivElement>(null);
   const { registerRefreshCallbacks } = useRefreshData();
+  
+  // Initialize filters with localStorage values or null for "All Time"
+  const [month, setMonth] = useState<string | null>(() => {
+    const savedMonth = localStorage.getItem("selectedMonth");
+    return savedMonth === "" ? null : savedMonth;
+  });
+  const [year, setYear] = useState<string | null>(() => {
+    const savedYear = localStorage.getItem("selectedYear");
+    return savedYear === "" ? null : savedYear;
+  });
 
   const [stats, setStats] = useState<DashboardStats>({
     totalIncome: 0,
@@ -70,7 +86,7 @@ const Dashboard = () => {
     setInsightsError(null);
 
     console.log("🟡 Calling insights API...");
-    const insightsResponse = await insightsService.getInsights();
+    const insightsResponse = await insightsService.getInsights(month, year);
     console.log("🟢 Insights response:", insightsResponse);
 
     if (insightsResponse.success && insightsResponse.data) {
@@ -78,7 +94,7 @@ const Dashboard = () => {
     }
 
     console.log("🟡 Calling dashboard stats API...");
-    const statsResponse = await dashboardService.getDashboardData();
+    const statsResponse = await dashboardService.getDashboardData(month, year);
     console.log("🟢 Stats response:", statsResponse);
 
     if (statsResponse.success && statsResponse.data) {
@@ -93,15 +109,28 @@ const Dashboard = () => {
   }
 };
 
+  // Restore filters from localStorage on mount
   useEffect(() => {
-    loadDashboardData();
+    const savedMonth = localStorage.getItem("selectedMonth");
+    const savedYear = localStorage.getItem("selectedYear");
+    
+    if (savedMonth && savedMonth !== "") {
+      setMonth(savedMonth === "" ? null : savedMonth);
+    }
+    if (savedYear && savedYear !== "") {
+      setYear(savedYear === "" ? null : savedYear);
+    }
   }, []);
 
   useEffect(() => {
     registerRefreshCallbacks({
       refreshDashboard: loadDashboardData
     });
-  }, [registerRefreshCallbacks]);
+  }, [registerRefreshCallbacks, month, year]);
+
+  useEffect(() => {
+    loadDashboardData();
+  }, [month, year]);
 
   if (loading) {
     return (
@@ -175,42 +204,35 @@ const Dashboard = () => {
           </p>
         </div>
 
-        {/* 📊 Monthly Financial Story */}
-<div className="bg-white border rounded-xl p-5 shadow-sm hover:bg-blue-50 transition">
+        {/* Monthly Financial Story */}
+        <div className="bg-white border rounded-xl p-5 shadow-sm hover:bg-blue-50 transition">
+          <h3 className="text-xs tracking-wide text-blue-600 uppercase mb-2">
+            Monthly Financial Story
+          </h3>
+          <p className="text-base font-semibold text-gray-800">
+            {stats.totalExpense < stats.totalIncome
+              ? `🎉 Great control! Your expenses are within your income.`
+              : `⚠️ Alert! Your expenses exceed your income.`}
+          </p>
+          <p className="text-sm text-gray-700 mt-2">
+            Based on your total income and expenses.
+          </p>
+        </div>
 
-  <h3 className="text-xs tracking-wide text-blue-600 uppercase mb-2">
-    Monthly Financial Story
-  </h3>
-
-  <p className="text-base font-semibold text-gray-800">
-    {stats.totalExpense < stats.totalIncome
-      ? `🎉 Great control! Your expenses are within your income.`
-      : `⚠️ Alert! Your expenses exceed your income.`}
-  </p>
-
-  <p className="text-sm text-gray-700 mt-2">
-    Based on your total income and expenses.
-  </p>
-
-</div>
-        {/* 🚀 Lifestyle Upgrade Detector */}
-<div className="bg-white border rounded-xl p-5 shadow-sm hover:bg-blue-50 transition">
-
-  <h3 className="text-xs tracking-wide text-blue-600 uppercase mb-2">
-    Lifestyle Upgrade Detector
-  </h3>
-
-  <p className="text-base font-semibold text-gray-800">
-    {stats.totalIncome > 0 &&(stats.totalExpense / stats.totalIncome) * 100 > 70
-      ? "🚀 High spending pattern detected."
-      : "✅ Your spending pattern is stable."}
-  </p>
-
-  <p className="text-sm text-gray-700 mt-2">
-    Based on your total income vs expense ratio.
-  </p>
-
-</div>
+        {/* Lifestyle Upgrade Detector */}
+        <div className="bg-white border rounded-xl p-5 shadow-sm hover:bg-blue-50 transition">
+          <h3 className="text-xs tracking-wide text-blue-600 uppercase mb-2">
+            Lifestyle Upgrade Detector
+          </h3>
+          <p className="text-base font-semibold text-gray-800">
+            {stats.totalIncome > 0 && (stats.totalExpense / stats.totalIncome) * 100 > 70
+              ? "🚀 High spending pattern detected."
+              : "✅ Your spending pattern is stable."}
+          </p>
+          <p className="text-sm text-gray-700 mt-2">
+            Based on your total income vs expense ratio.
+          </p>
+        </div>
 
         {insightsError && (
           <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
