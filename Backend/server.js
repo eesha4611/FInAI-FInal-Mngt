@@ -26,7 +26,7 @@ const analyticsRoutes = require('./routes/analytics');
 
 // DB connections
 const db = require('./config/db');
-const { sequelize } = require('./models');
+
 
 const app = express();
 const PORT = process.env.PORT || 5001;
@@ -45,13 +45,6 @@ db.getConnection()
     console.error('❌ MySQL connection failed:', err.message);
   });
 
-sequelize.sync({ alter: false })
-  .then(() => {
-    console.log('✅ Sequelize models synced');
-  })
-  .catch(err => {
-    console.error('❌ Sequelize sync failed:', err.message);
-  });
 
 
 // =======================
